@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Image Processing App</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.58.3/build/stlite.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.58.3/build/stlite.js"></script>
+    <script>
+      stlite.mount(
+        {
+          requirements: ["streamlit", "Pillow"],
+          entrypoint: "streamlit_app.py",
+          files: {
+            "streamlit_app.py": `
+import streamlit as st
+from PIL import Image, ImageOps, ImageFilter, ImageChops
+import io
+
+st.title('画像処理アプリ')
+
+# サイドバーでモードを選択
+mode = st.sidebar.selectbox("モードを選択してください", ["モノクロ", "明るさ調整", "セピア", "モザイク", "輪郭", "絵画"])
+
+uploaded_file = st.file_uploader("画像をアップロードしてください", type=["png", "jpg", "jpeg"])
+
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption='アップロードされた画像。', use_column_width=True)
+
+    if mode == "モノクロ":
+        if st.button('モノクロ化', type="primary", use_container_width=True):
+            grayscale_image = image.convert('L')
+            st.image(grayscale_image, caption='グレースケール化された画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            grayscale_image.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード",
+                data=byte_im,
+                file_name="grayscale_image.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+        if st.button('モノクロ化（白黒反転）', type="primary", use_container_width=True):
+            grayscale_image = image.convert('L')
+            inverted_image = ImageOps.invert(grayscale_image)
+            st.image(inverted_image, caption='白黒反転された画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            inverted_image.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（白黒反転）",
+                data=byte_im,
+                file_name="grayscale_inverted.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+    elif mode == "明るさ調整":
+        brightness = st.slider("明るさを調整してください", 0.25, 2.0, 1.0)
+        adjusted_image = image.point(lambda p: p * brightness)
+        st.image(adjusted_image, caption='明るさ調整された画像。', use_column_width=True)
+
+        buf = io.BytesIO()
+        adjusted_image.save(buf, format="PNG")
+        byte_im = buf.getvalue()
+
+        st.download_button(
+            label="画像をダウンロード（明るさ調整）",
+            data=byte_im,
+            file_name="brightness_adjusted_image.png",
+            mime="image/png",
+            type="primary",
+            use_container_width=True
+        )
+
+    elif mode == "セピア":
+        sepia_intensity = st.slider("セピア化の度合いを調整してください", 0.0, 1.0, 0.5)
+        gray = image.convert("L")
+        sepia_image = Image.merge(
+            "RGB",
+            (
+                gray.point(lambda x: x * (240 * sepia_intensity + 15 * (1 - sepia_intensity)) / 255),
+                gray.point(lambda x: x * (200 * sepia_intensity + 55 * (1 - sepia_intensity)) / 255),
+                gray.point(lambda x: x * (145 * sepia_intensity + 110 * (1 - sepia_intensity)) / 255)
+            )
+        )
+        st.image(sepia_image, caption='セピア化された画像。', use_column_width=True)
+
+        buf = io.BytesIO()
+        sepia_image.save(buf, format="PNG")
+        byte_im = buf.getvalue()
+
+        st.download_button(
+            label="画像をダウンロード（セピア）",
+            data=byte_im,
+            file_name="sepia_image.png",
+            mime="image/png",
+            type="primary",
+            use_container_width=True
+        )
+
+    elif mode == "モザイク":
+        if st.button('モザイク化', type="primary", use_container_width=True):
+            # モザイク化処理
+            mosaic_image = image.convert("L").resize((32, 32)).resize(image.size, resample=0)
+            st.image(mosaic_image, caption='モザイク化された画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            mosaic_image.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（モザイク）",
+                data=byte_im,
+                file_name="mosaic_image.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+    elif mode == "輪郭":
+        if st.button('輪郭のみにする', type="primary", use_container_width=True):
+            contour_image = image.filter(ImageFilter.CONTOUR)
+            st.image(contour_image, caption='輪郭のみの画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            contour_image.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（輪郭のみ）",
+                data=byte_im,
+                file_name="contour_image.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+        if st.button('版画風', type="primary", use_container_width=True):
+            edge_image = image.filter(ImageFilter.FIND_EDGES)
+            st.image(edge_image, caption='版画風の画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            edge_image.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（版画風）",
+                data=byte_im,
+                file_name="edge_image.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+    elif mode == "絵画":
+        if st.button('絵画風（輪郭無し）', type="primary", use_container_width=True):
+            qant_img = image.quantize(8, kmeans=True).convert("RGB")
+            t = qant_img.filter(ImageFilter.ModeFilter(12))
+            t = t.filter(ImageFilter.GaussianBlur(5))
+            t = t.filter(ImageFilter.ModeFilter(12))
+            t = t.filter(ImageFilter.GaussianBlur(1))
+            st.image(t, caption='絵画風（輪郭無し）の画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            t.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（絵画風・輪郭無し）",
+                data=byte_im,
+                file_name="painting_style_no_edges.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+
+        if st.button('絵画風（輪郭有り）', type="primary", use_container_width=True):
+            qant_img = image.quantize(8, kmeans=True).convert("RGB")
+            t = qant_img.filter(ImageFilter.ModeFilter(12))
+            t = t.filter(ImageFilter.GaussianBlur(5))
+            t = t.filter(ImageFilter.ModeFilter(12))
+            t = t.filter(ImageFilter.GaussianBlur(1))
+            color_img = t.convert("RGB")
+
+            gray = image.convert("L")
+            gray2 = gray.filter(ImageFilter.MaxFilter(5))
+            line_inv = ImageChops.difference(gray, gray2)
+            line_img = ImageOps.invert(line_inv).convert("RGB")
+
+            painting_with_edges = ImageChops.multiply(color_img, line_img)
+            st.image(painting_with_edges, caption='絵画風（輪郭有り）の画像。', use_column_width=True)
+
+            buf = io.BytesIO()
+            painting_with_edges.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+
+            st.download_button(
+                label="画像をダウンロード（絵画風・輪郭有り）",
+                data=byte_im,
+                file_name="painting_style_with_edges.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
+`,
+          },
+        },
+        document.getElementById("root")
+      );
+    </script>
+  </body>
+</html>
