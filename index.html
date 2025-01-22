@@ -32,7 +32,7 @@ import numpy as np
 st.title('画像処理アプリ')
 
 # サイドバーでモードを選択
-mode = st.sidebar.selectbox("モードを選択してください", ["モザイク", "輪郭", "絵画", "ピクセル", "ミニチュア", "顔モザイク"])
+mode = st.sidebar.selectbox("モードを選択してください", ["モザイク", "輪郭", "絵画", "ピクセル", "ミニチュア", "顔モザイク", "魚眼レンズ"])
 
 uploaded_file = st.file_uploader("画像をアップロードしてください", type=["png", "jpg", "jpeg"])
 
@@ -83,6 +83,23 @@ def face_mosaic(img, ratio=0.1):
         img[y:y+h, x:x+w] = mosaic(face_img, ratio)
 
     return img
+
+def anglar_fisheye(img, w=40):
+    out_img = np.zeros_like(img)
+    r = max(img.shape[1], img.shape[0]) / 2
+    center_x = img.shape[1] / 2
+    center_y = img.shape[0] / 2
+
+    for y in range(img.shape[0]):
+        for x in range(img.shape[1]):
+            rp = np.sqrt(w * w + (x - center_x) ** 2 + (y - center_y) ** 2)
+            vx = int((rp * (x - center_x)) / r + center_x)
+            vy = int((rp * (y - center_y)) / r + center_y)
+
+            if 0 <= vx < img.shape[1] and 0 <= vy < img.shape[0]:
+                out_img[y, x] = img[vy, vx]
+
+    return out_img
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -275,6 +292,36 @@ if uploaded_file is not None:
             label="画像をダウンロード（顔モザイク）",
             data=byte_im,
             file_name="face_mosaic_image.png",
+            mime="image/png",
+            type="primary",
+            use_container_width=True
+        )
+
+    elif mode == "魚眼レンズ":
+        # スライダーで重みを調整
+        w = st.slider("魚眼レンズの重みを調整してください", 1, 100, 40)
+
+        # OpenCVで画像を読み込むために変換
+        img_array = np.array(image)
+        img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+        # 魚眼レンズ化
+        fisheye_image = anglar_fisheye(img_bgr, w)
+
+        # 変換後の画像をPIL形式に戻す
+        fisheye_image_rgb = cv2.cvtColor(fisheye_image, cv2.COLOR_BGR2RGB)
+        fisheye_pil = Image.fromarray(fisheye_image_rgb)
+
+        st.image(fisheye_pil, caption='魚眼レンズ化された画像。', use_column_width=True)
+
+        buf = io.BytesIO()
+        fisheye_pil.save(buf, format="PNG")
+        byte_im = buf.getvalue()
+
+        st.download_button(
+            label="画像をダウンロード（魚眼レンズ）",
+            data=byte_im,
+            file_name="fisheye_image.png",
             mime="image/png",
             type="primary",
             use_container_width=True
