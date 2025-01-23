@@ -19,7 +19,7 @@
     <script>
       stlite.mount(
         {
-          requirements: ["streamlit", "Pillow", "opencv-python", "numpy"],
+          requirements: ["streamlit", "Pillow", "opencv-python", "numpy", "streamlit-drawable-canvas"],
           entrypoint: "streamlit_app.py",
           files: {
             "streamlit_app.py": `
@@ -28,11 +28,12 @@ from PIL import Image, ImageOps, ImageFilter, ImageChops
 import io
 import cv2
 import numpy as np
+from streamlit_drawable_canvas import st_canvas
 
 st.title('画像処理アプリ')
 
 # サイドバーでモードを選択
-mode = st.sidebar.selectbox("モードを選択してください", ["モザイク", "輪郭", "絵画", "ピクセル", "ミニチュア", "顔モザイク", "魚眼レンズ"])
+mode = st.sidebar.selectbox("モードを選択してください", ["モザイク", "輪郭", "絵画", "ピクセル", "ミニチュア", "顔モザイク", "魚眼レンズ", "消しゴム"])
 
 uploaded_file = st.file_uploader("画像をアップロードしてください", type=["png", "jpg", "jpeg"])
 
@@ -326,6 +327,37 @@ if uploaded_file is not None:
             type="primary",
             use_container_width=True
         )
+
+    elif mode == "消しゴム":
+        # 画像を読み込む
+        img = image.resize((400, 300))  # 画像を400x300にリサイズ
+        img_np = np.array(img)
+
+        # キャンバスの設定
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 0, 0, 0.5)",  # 半透明の赤色
+            stroke_width=20,  # ペンの太さ
+            stroke_color="rgba(255, 0, 0, 1)",  # 赤色
+            background_image=img,  # 画像を背景に設定
+            update_streamlit=True,
+            height=300,  # キャンバスの高さ
+            width=400,   # キャンバスの幅
+            drawing_mode="freedraw",
+            key="canvas",
+        )
+
+        # マスクを取得
+        if canvas_result.image_data is not None:
+            mask = np.array(canvas_result.image_data[:, :, 3])  # アルファチャンネルをマスクとして使用
+            mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]  # 二値化
+
+            # 補完ボタン
+            if st.button("指定部分を消す"):
+                # 補完処理を実行
+                inpainted_img = cv2.inpaint(img_np, mask, 3, cv2.INPAINT_TELEA)
+
+                # 補完結果を表示
+                st.image(inpainted_img, caption="Inpainted Image", width=400)
 `,
           },
         },
